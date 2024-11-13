@@ -150,3 +150,27 @@ create index if not exists idx_message_reactions_message_id on public.message_re
 create index if not exists idx_tasks_message_id on public.tasks(message_id);
 create index if not exists idx_tasks_assigned_to on public.tasks(assigned_to);
 create index if not exists idx_profiles_username on public.profiles(username);
+
+-- Training tables
+create table if not exists public.training_categories (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null,
+  description text,
+  color text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.course_categories (
+  course_id uuid references public.training_courses on delete cascade,
+  category_id uuid references public.training_categories on delete cascade,
+  primary key (course_id, category_id)
+);
+
+create table if not exists public.user_course_activity (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade,
+  course_id uuid references public.training_courses on delete cascade,
+  lesson_id uuid references public.training_lessons on delete cascade,
+  activity_type text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);

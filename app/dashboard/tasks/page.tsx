@@ -46,8 +46,16 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <TaskStats tasks={tasks} />
-      <TaskList tasks={tasks} />
+      <TaskStats tasks={tasks.map(task => ({
+        ...task,
+        created_by: { username: task.created_by },
+        assigned_to: { username: task.assigned_to }
+      }))} />
+      <TaskList tasks={tasks.map(task => ({
+        ...task,
+        created_by: { username: task.created_by },
+        assigned_to: { username: task.assigned_to }
+      }))} />
     </div>
   );
 }

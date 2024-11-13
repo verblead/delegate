@@ -1,51 +1,34 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useSocket } from '@/hooks/use-socket';
-import { useAuth } from '@/hooks/use-auth';
+import { useSupabase } from '@/hooks/use-supabase';
 
 interface TypingIndicatorProps {
-  channelId: string;
+  recipientId: string;
 }
 
-export function TypingIndicator({ channelId }: TypingIndicatorProps) {
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const { socket } = useSocket(channelId);
-  const { user } = useAuth();
+export function TypingIndicator({ recipientId }: TypingIndicatorProps) {
+  const [isTyping, setIsTyping] = useState(false);
+  const { supabase } = useSupabase();
 
   useEffect(() => {
-    if (!socket || !user) return;
-
-    const handleUserTyping = ({ userId }: { userId: string }) => {
-      if (userId !== user.id) {
-        setTypingUsers((prev) => new Set(prev).add(userId));
-      }
-    };
-
-    const handleUserStopTyping = ({ userId }: { userId: string }) => {
-      setTypingUsers((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-    };
-
-    socket.on('user-typing', handleUserTyping);
-    socket.on('user-stop-typing', handleUserStopTyping);
+    const channel = supabase.channel(`typing:${recipientId}`)
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 3000);
+      })
+      .subscribe();
 
     return () => {
-      socket.off('user-typing', handleUserTyping);
-      socket.off('user-stop-typing', handleUserStopTyping);
+      channel.unsubscribe();
     };
-  }, [socket, user]);
+  }, [recipientId, supabase]);
 
-  if (typingUsers.size === 0) return null;
+  if (!isTyping) return null;
 
   return (
-    <div className="px-4 py-2 text-sm text-muted-foreground">
-      {Array.from(typingUsers).length === 1
-        ? 'Someone is typing...'
-        : 'Multiple people are typing...'}
+    <div className="text-sm text-muted-foreground animate-pulse">
+      Someone is typing...
     </div>
   );
 }

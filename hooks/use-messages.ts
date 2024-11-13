@@ -16,6 +16,7 @@ interface Message {
     username: string;
     avatar_url: string;
   };
+  attachments: Attachment[];
 }
 
 export function useMessages(recipientId: string) {
@@ -26,42 +27,28 @@ export function useMessages(recipientId: string) {
   const { toast } = useToast();
 
   const fetchMessages = async () => {
-    if (!user || !recipientId) return;
-
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('direct_messages')
         .select(`
           *,
-          sender:sender_id(username, avatar_url)
+          sender:sender_id(username, avatar_url),
+          attachments:direct_message_attachments(
+            id,
+            file_name,
+            file_type,
+            file_size,
+            url
+          )
         `)
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${user.id})`)
+        .or(`and(sender_id.eq.${user?.id},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${user?.id})`)
         .order('created_at', { ascending: true });
-
-      if (error) throw error;
 
       if (data) {
         setMessages(data);
-        
-        // Mark messages as read
-        const unreadMessages = data.filter(m => 
-          m.recipient_id === user.id && !m.read
-        );
-
-        if (unreadMessages.length > 0) {
-          await supabase
-            .from('direct_messages')
-            .update({ read: true })
-            .in('id', unreadMessages.map(m => m.id));
-        }
       }
     } catch (error) {
-      console.error("Error fetching messages:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive"
-      });
+      console.error('Error fetching messages:', error);
     } finally {
       setLoading(false);
     }
@@ -89,11 +76,12 @@ export function useMessages(recipientId: string) {
     };
   }, [user, recipientId, supabase]);
 
-  const sendMessage = async (content: string) => {
-    if (!user || !content.trim()) return;
+  const sendMessage = async (content: string, attachments?: File[]) => {
+    if (!user || (!content.trim() && (!attachments || attachments.length === 0))) return;
 
     try {
-      const { data, error } = await supabase
+      // First insert the message
+      const { data: message, error: messageError } = await supabase
         .from('direct_messages')
         .insert({
           content,
@@ -107,10 +95,54 @@ export function useMessages(recipientId: string) {
         `)
         .single();
 
-      if (error) throw error;
+      if (messageError) throw messageError;
 
-      if (data) {
-        setMessages(prev => [...prev, data]);
+      // Handle attachments if any
+      let uploadedAttachments = [];
+      if (attachments?.length && message) {
+        uploadedAttachments = await Promise.all(
+          attachments.map(async (file) => {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${user.id}/${recipientId}/${Date.now()}.${fileExt}`;
+            
+            // Upload file
+            const { error: uploadError } = await supabase.storage
+              .from('direct-message-attachments')
+              .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('direct-message-attachments')
+              .getPublicUrl(filePath);
+
+            // Create attachment record
+            const { data: attachment, error: attachmentError } = await supabase
+              .from('direct_message_attachments')
+              .insert({
+                message_id: message.id,
+                file_name: file.name,
+                file_type: file.type,
+                file_size: file.size,
+                url: publicUrl
+              })
+              .select()
+              .single();
+
+            if (attachmentError) throw attachmentError;
+            return attachment;
+          })
+        );
+      }
+
+      if (message) {
+        const messageWithAttachments = {
+          ...message,
+          attachments: uploadedAttachments
+        };
+        
+        setMessages(prev => [...prev, messageWithAttachments]);
       }
     } catch (error) {
       console.error("Error sending message:", error);

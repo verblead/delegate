@@ -1,120 +1,62 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useSupabase } from './use-supabase';
-import { useAuth } from './use-auth';
+import { useEffect, useState } from "react";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useAuth } from "./use-auth";
 
-interface UserPresence {
+interface Profile {
   id: string;
   username: string;
   avatar_url: string;
-  status: string;
-  updated_at: string;
 }
 
 export function usePresence() {
-  const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { supabase } = useSupabase();
   const { user } = useAuth();
+  const [onlineUsers, setOnlineUsers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     if (!user) return;
 
-    const updatePresence = async () => {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            status: 'online',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+    const channel = supabase.channel('online-users');
 
-        if (error) {
-          console.error('Error updating presence:', error);
-        }
-      } catch (error) {
-        console.error('Error in updatePresence:', error);
-      }
+    const trackPresence = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      await channel
+        .on('presence', { event: 'sync' }, () => {
+          const newState = channel.presenceState();
+          const onlineProfiles = Object.values(newState)
+            .flat()
+            .map((presence: any) => presence.profile)
+            .filter(Boolean);
+          setOnlineUsers(onlineProfiles);
+          setLoading(false);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({
+              profile: {
+                id: user.id,
+                username: profile?.username || user.email?.split('@')[0] || 'Anonymous',
+                avatar_url: profile?.avatar_url || `https://avatar.vercel.sh/${user.id}`
+              }
+            });
+          }
+        });
     };
 
-    const fetchOnlineUsers = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, status, updated_at')
-          .not('id', 'eq', user.id)
-          .eq('status', 'online')
-          .gte(
-            'updated_at',
-            new Date(Date.now() - 2 * 60 * 1000).toISOString() // 2 minutes threshold
-          );
+    trackPresence();
 
-        if (error) {
-          console.error('Error fetching online users:', error);
-          return;
-        }
-
-        if (data) {
-          setOnlineUsers(data);
-        }
-      } catch (error) {
-        console.error('Error in fetchOnlineUsers:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Initial presence update
-    updatePresence();
-    fetchOnlineUsers();
-
-    // Set up realtime subscription
-    const channel = supabase.channel('presence-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: 'status=eq.online'
-        },
-        () => fetchOnlineUsers()
-      )
-      .subscribe();
-
-    // Keep presence alive
-    const presenceInterval = setInterval(() => {
-      updatePresence();
-      fetchOnlineUsers();
-    }, 30000);
-
-    // Handle visibility changes
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        updatePresence();
-        fetchOnlineUsers();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup
     return () => {
       channel.unsubscribe();
-      clearInterval(presenceInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      
-      // Set offline when leaving
-      supabase
-        .from('profiles')
-        .update({ 
-          status: 'offline',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
     };
-  }, [supabase, user]);
+  }, [user, supabase]);
 
   return { onlineUsers, loading };
 }

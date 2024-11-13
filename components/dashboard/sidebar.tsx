@@ -17,7 +17,8 @@ import {
   FolderKanban,
   Menu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BookOpen
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -63,6 +64,11 @@ const sidebarItems = [
     title: "Members",
     icon: Users,
     href: "/dashboard/members",
+  },
+  {
+    title: "Training",
+    icon: BookOpen,
+    href: "/dashboard/training",
   },
   {
     title: "Achievements",

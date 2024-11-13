@@ -1,6 +1,6 @@
 "use client";
 
-import { Message } from "@/lib/types";
+import { BaseMessage } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { useSupabase } from "@/hooks/use-supabase";
 import { useEffect, useState } from "react";
 
 interface MessageListProps {
-  messages: Message[];
+  messages: BaseMessage[];
 }
 
 interface UserProfile {
@@ -25,7 +25,7 @@ export function MessageList({ messages }: MessageListProps) {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      const userIds = [...new Set(messages.map(m => m.sender_id))];
+      const userIds = [...new Set(messages.map(m => m.sender.id))];
       
       const { data, error } = await supabase
         .from('profiles')
@@ -49,8 +49,8 @@ export function MessageList({ messages }: MessageListProps) {
   return (
     <div className="space-y-4">
       {messages.map((message) => {
-        const isCurrentUser = message.sender_id === user?.id;
-        const profile = userProfiles[message.sender_id];
+        const isCurrentUser = message.sender.id === user?.id;
+        const profile = userProfiles[message.sender.id];
         const displayName = profile?.username || profile?.email?.split('@')[0] || 'Unknown User';
         
         return (

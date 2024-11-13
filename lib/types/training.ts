@@ -1,38 +1,27 @@
 export interface Course {
   id: string;
   title: string;
-  description?: string;
-  thumbnail_url?: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  estimated_hours?: number;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  published: boolean;
-  published_at?: string;
+  description: string | null;
+  total_lessons: number;
+  created_at?: string;
 }
 
-export interface Module {
-  id: string;
-  course_id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
+export interface UserProgress {
+  [courseId: string]: {
+    completed_lessons: number;
+    last_accessed: string;
+    completed: boolean;
+    completion_date: string | null;
+  };
 }
 
 export interface Lesson {
   id: string;
-  module_id: string;
+  course_id: string;
   title: string;
-  description?: string;
-  content_type: 'video' | 'document' | 'slides';
-  content_url: string;
-  duration_minutes?: number;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
+  description: string | null;
+  sequence: number;
+  content: string;
 }
 
 export interface Question {
@@ -52,17 +41,6 @@ export interface Answer {
   answer_text: string;
   is_correct: boolean;
   created_at: string;
-}
-
-export interface UserProgress {
-  id: string;
-  user_id: string;
-  lesson_id: string;
-  status: 'not_started' | 'in_progress' | 'completed';
-  progress_percent: number;
-  completed_at?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface AssessmentResult {

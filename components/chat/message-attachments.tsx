@@ -1,6 +1,6 @@
 "use client";
 
-import { Attachment } from "@/lib/supabase/schema";
+import { Attachment } from "@/lib/types";
 import { FileIcon, ImageIcon, PlayIcon } from "lucide-react";
 
 interface MessageAttachmentsProps {

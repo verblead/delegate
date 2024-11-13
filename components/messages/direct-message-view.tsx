@@ -4,23 +4,27 @@ import { useMessages } from "@/hooks/use-messages";
 import { useSupabase } from "@/hooks/use-supabase";
 import { useEffect, useState, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/hooks/use-auth";
+import { DirectMessageInput } from "../chat/direct-message-input";
+import { MessageAttachments } from "../chat/message-attachments";
 
 interface DirectMessageViewProps {
   userId: string;
   onMessageSent?: () => void;
 }
 
+interface Recipient {
+  username: string;
+  avatar_url: string;
+}
+
 export function DirectMessageView({ userId, onMessageSent }: DirectMessageViewProps) {
   const { messages, loading, sendMessage } = useMessages(userId);
-  const [newMessage, setNewMessage] = useState("");
-  const [recipient, setRecipient] = useState<any>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [recipient, setRecipient] = useState<Recipient | null>(null);
   const { supabase } = useSupabase();
   const { user: currentUser } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,14 +49,17 @@ export function DirectMessageView({ userId, onMessageSent }: DirectMessageViewPr
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-
-    await sendMessage(newMessage);
-    setNewMessage("");
-    if (onMessageSent) {
-      onMessageSent();
+  const handleSendMessage = async (content: string, files?: File[]) => {
+    if (!content.trim() && (!files || files.length === 0)) return;
+    
+    try {
+      await sendMessage(content, files || attachments);
+      setAttachments([]);
+      if (onMessageSent) {
+        onMessageSent();
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
   };
 
@@ -107,6 +114,9 @@ export function DirectMessageView({ userId, onMessageSent }: DirectMessageViewPr
                 >
                   {message.content}
                 </div>
+                {message.attachments && message.attachments.length > 0 && (
+                  <MessageAttachments attachments={message.attachments} />
+                )}
                 <span className="text-xs text-muted-foreground mt-1">
                   {formatDistanceToNow(new Date(message.created_at), {
                     addSuffix: true,
@@ -119,18 +129,12 @@ export function DirectMessageView({ userId, onMessageSent }: DirectMessageViewPr
         </div>
       </ScrollArea>
 
-      <form onSubmit={handleSend} className="p-4 border-t">
-        <div className="flex gap-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-          />
-          <Button type="submit" size="icon" disabled={!newMessage.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </form>
+      <div className="p-4 border-t">
+        <DirectMessageInput 
+          recipientId={userId}
+          onSend={handleSendMessage}
+        />
+      </div>
     </div>
   );
 }
