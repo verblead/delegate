@@ -14,7 +14,10 @@ export function useChat(channelId: string) {
   const { user } = useAuth();
   
   const fetchMessages = async () => {
-    if (!channelId || !user) return;
+    if (!channelId || !user) {
+      console.log('Missing channelId or user:', { channelId, userId: user?.id });
+      return;
+    }
     
     try {
       const { data, error } = await supabase
@@ -37,14 +40,12 @@ export function useChat(channelId: string) {
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
-      }
+      console.log('Raw Supabase response:', { data, error });
+
+      if (error) throw error;
 
       if (data) {
-        console.log('Fetched messages:', data);
-        const transformedMessages: BaseMessage[] = data.map(message => ({
+        const transformedMessages = data.map(message => ({
           id: message.id,
           content: message.content,
           created_at: message.created_at,
@@ -55,6 +56,8 @@ export function useChat(channelId: string) {
           },
           attachments: message.attachments
         }));
+        
+        console.log('Transformed messages:', transformedMessages);
         setMessages(transformedMessages);
       }
     } catch (error: any) {

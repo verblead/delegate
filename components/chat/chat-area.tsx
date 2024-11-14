@@ -16,14 +16,23 @@ interface ChatAreaProps {
   channelId: string;
 }
 
+interface Channel {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_private: boolean;
+}
+
+interface ChannelSettingsData {
+  name: string;
+  description: string | undefined;
+  is_private: boolean;
+}
+
 export function ChatArea({ channelId }: ChatAreaProps) {
   const { messages, loading, sendMessage } = useChat(channelId);
   const { channels } = useChannels();
-  const [currentChannel, setCurrentChannel] = useState<{ 
-    name: string; 
-    description?: string;
-    is_private: boolean;
-  } | null>(null);
+  const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [memberListOpen, setMemberListOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -31,9 +40,19 @@ export function ChatArea({ channelId }: ChatAreaProps) {
   useEffect(() => {
     const channel = channels.find(c => c.id === channelId);
     if (channel) {
-      setCurrentChannel(channel);
+      setCurrentChannel({
+        id: channel.id,
+        name: channel.name,
+        description: channel.description || null,
+        is_private: channel.is_private
+      });
     }
   }, [channelId, channels]);
+
+  useEffect(() => {
+    console.log('Current channelId:', channelId);
+    console.log('Current messages:', messages);
+  }, [channelId, messages]);
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -63,7 +82,7 @@ export function ChatArea({ channelId }: ChatAreaProps) {
 
       <ScrollArea className="flex-1">
         <div className="p-4">
-          {messages.length > 0 ? (
+          {Array.isArray(messages) && messages.length > 0 ? (
             <MessageList messages={messages} />
           ) : (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] text-muted-foreground">
@@ -97,7 +116,7 @@ export function ChatArea({ channelId }: ChatAreaProps) {
           channelId={channelId}
           initialData={{
             name: currentChannel.name,
-            description: currentChannel.description,
+            description: currentChannel.description || undefined,
             is_private: currentChannel.is_private
           }}
         />

@@ -22,6 +22,7 @@ export function MessageList({ messages }: MessageListProps) {
   const { user } = useAuth();
   const { supabase } = useSupabase();
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+  const seenMessages: string[] = [];
 
   useEffect(() => {
     const fetchProfiles = async () => {
